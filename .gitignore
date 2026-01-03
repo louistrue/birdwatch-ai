@@ -1,0 +1,79 @@
+# Environment and secrets
+.env
+*.env
+!.env.example
+
+# Data directories
+data/snapshots/*
+data/recordings/*
+data/postgres/*
+!data/.gitkeep
+
+# Mosquitto data
+mosquitto/data/*
+mosquitto/log/*
+!mosquitto/data/.gitkeep
+!mosquitto/log/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+venv/
+ENV/
+env/
+
+# Models
+classifier/model/*.tflite
+classifier/model/*.h5
+classifier/model/*.pb
+classifier/model/labels.txt
+!classifier/model/README.md
+!classifier/model/download_model.sh
+!classifier/model/test_model.py
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+
+# Docker
+docker-compose.override.yml
+
+# Database dumps
+*.sql.gz
+*.dump
+
+# Backups
+backup/
+*.tar.gz
