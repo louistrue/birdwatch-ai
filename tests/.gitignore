@@ -1,0 +1,16 @@
+# Test data and fixtures
+data/
+fixtures/images/*.jpg
+fixtures/images/*.jpeg
+fixtures/images/*.png
+fixtures/videos/*.mp4
+fixtures/videos/*.avi
+
+# Test results
+*.html
+*.xml
+.pytest_cache/
+__pycache__/
+
+# Docker volumes
+postgres_data/

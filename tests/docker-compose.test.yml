@@ -1,0 +1,181 @@
+version: '3.8'
+
+# E2E Testing Stack - Simulates entire birdwatch system without physical hardware
+
+services:
+  # MQTT Broker
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: test-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto-test.conf:/mosquitto/config/mosquitto.conf
+    networks:
+      - test-birdwatch
+
+  # Simulated RTSP Camera - Streams test videos on loop
+  rtsp-simulator:
+    image: ullaakut/rtspatt:latest
+    container_name: test-rtsp-camera
+    command: >
+      /bin/sh -c "
+      while true; do
+        ffmpeg -re -stream_loop -1 -i /videos/bird_test.mp4
+        -c:v libx264 -preset ultrafast -tune zerolatency
+        -f rtsp rtsp://0.0.0.0:8554/camera1
+      done
+      "
+    volumes:
+      - ./fixtures/videos:/videos:ro
+    ports:
+      - "8554:8554"
+    networks:
+      - test-birdwatch
+
+  # Frigate NVR
+  frigate:
+    image: ghcr.io/blakeblackshear/frigate:stable
+    container_name: test-frigate
+    privileged: true
+    shm_size: '256mb'
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./frigate.test.yml:/config/config.yml
+      - ./data/test-recordings:/media/frigate
+      - ./data/test-snapshots:/media/snapshots
+      - type: tmpfs
+        target: /tmp/cache
+        tmpfs:
+          size: 500000000
+    depends_on:
+      - mosquitto
+      - rtsp-simulator
+    networks:
+      - test-birdwatch
+
+  # PostgreSQL Database
+  database:
+    image: postgres:15-alpine
+    container_name: test-db
+    environment:
+      - POSTGRES_DB=birdwatch_test
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=test_pass
+    volumes:
+      - ../database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5433:5432"
+    networks:
+      - test-birdwatch
+
+  # Bird Classifier
+  classifier:
+    build:
+      context: ../classifier
+      dockerfile: Dockerfile
+    container_name: test-classifier
+    volumes:
+      - ./data/test-snapshots:/snapshots
+      - ../classifier/model:/app/model
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - DB_HOST=database
+      - DB_NAME=birdwatch_test
+      - DB_USER=test_user
+      - DB_PASSWORD=test_pass
+      - MODEL_PATH=/app/model/birds_model.tflite
+      - CONFIDENCE_THRESHOLD=0.3
+    depends_on:
+      - mosquitto
+      - database
+    networks:
+      - test-birdwatch
+
+  # Correlator
+  correlator:
+    build:
+      context: ../correlator
+      dockerfile: Dockerfile
+    container_name: test-correlator
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - DB_HOST=database
+      - DB_NAME=birdwatch_test
+      - DB_USER=test_user
+      - DB_PASSWORD=test_pass
+      - CORRELATION_WINDOW=30
+    depends_on:
+      - mosquitto
+      - database
+      - classifier
+    networks:
+      - test-birdwatch
+
+  # Web Dashboard
+  web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+    container_name: test-web
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./data/test-snapshots:/app/static/snapshots:ro
+    environment:
+      - DB_HOST=database
+      - DB_NAME=birdwatch_test
+      - DB_USER=test_user
+      - DB_PASSWORD=test_pass
+      - FRIGATE_URL=http://frigate:5000
+    depends_on:
+      - database
+      - frigate
+    networks:
+      - test-birdwatch
+
+  # Mock Audio Detection Service (simulates BirdNET)
+  audio-simulator:
+    build:
+      context: ./mock-services
+      dockerfile: Dockerfile.audio
+    container_name: test-audio-simulator
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+    depends_on:
+      - mosquitto
+    networks:
+      - test-birdwatch
+
+  # E2E Test Runner
+  test-runner:
+    build:
+      context: ./e2e
+      dockerfile: Dockerfile
+    container_name: test-runner
+    volumes:
+      - ./e2e:/tests
+      - ./data:/test-data
+    environment:
+      - DB_HOST=database
+      - DB_NAME=birdwatch_test
+      - DB_USER=test_user
+      - DB_PASSWORD=test_pass
+      - MQTT_HOST=mosquitto
+      - WEB_URL=http://web:8080
+      - FRIGATE_URL=http://frigate:5000
+    depends_on:
+      - web
+      - classifier
+      - correlator
+    networks:
+      - test-birdwatch
+    command: pytest /tests -v --html=/test-data/report.html
+
+networks:
+  test-birdwatch:
+    driver: bridge

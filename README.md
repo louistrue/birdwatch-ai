@@ -475,6 +475,30 @@ tar -czf data_backup.tar.gz data/snapshots data/recordings
 find data/snapshots -type f -mtime +30 -delete
 ```
 
+## Testing
+
+### E2E Testing (No Hardware Required!)
+
+You can test the **entire system** without any physical hardware:
+
+```bash
+cd tests
+./run_e2e_tests.sh
+```
+
+This simulates:
+- RTSP camera feed (using FFmpeg)
+- Audio detections (mock BirdNET)
+- Complete pipeline (Frigate → Classifier → Database → Dashboard)
+
+See [tests/README.md](tests/README.md) for complete testing guide.
+
+Benefits:
+- ✅ Test before buying hardware
+- ✅ Validate configuration changes
+- ✅ CI/CD integration
+- ✅ Rapid development iteration
+
 ## Resources
 
 - [Frigate Documentation](https://frigate.video/)

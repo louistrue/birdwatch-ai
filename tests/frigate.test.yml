@@ -1,0 +1,74 @@
+mqtt:
+  enabled: true
+  host: mosquitto
+  port: 1883
+
+detectors:
+  cpu:
+    type: cpu
+    num_threads: 2
+
+cameras:
+  test_camera:
+    enabled: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://rtsp-simulator:8554/camera1
+          roles:
+            - detect
+            - record
+
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
+
+    objects:
+      track:
+        - bird
+      filters:
+        bird:
+          min_area: 100
+          min_score: 0.3
+          threshold: 0.5
+
+    snapshots:
+      enabled: true
+      timestamp: false
+      bounding_box: true
+      crop: true
+      required_zones: []
+      retain:
+        default: 7
+
+    record:
+      enabled: true
+      retain:
+        days: 1
+        mode: motion
+      events:
+        retain:
+          default: 3
+          mode: motion
+
+# Test-specific zones (adjust based on your test video)
+    zones:
+      feeder_area:
+        coordinates: 320,180,960,180,960,540,320,540
+        objects:
+          - bird
+
+snapshots:
+  enabled: true
+  retain:
+    default: 7
+
+record:
+  enabled: true
+  retain:
+    days: 1
+  events:
+    retain:
+      default: 3
+      mode: motion
