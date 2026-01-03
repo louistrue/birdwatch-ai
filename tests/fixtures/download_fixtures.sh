@@ -58,7 +58,7 @@ if command -v ffmpeg &> /dev/null; then
 else
     echo "Warning: ffmpeg not found. Cannot generate test video from images."
     echo "Attempting to download a fallback bird video..."
-    curl -L "https://github.com/louis-true/birdwatch-ai/raw/main/tests/fixtures/videos/bird_test_fallback.mp4" \
+    curl -L "https://github.com/louistrue/birdwatch-ai/raw/main/tests/fixtures/videos/bird_test_fallback.mp4" \
       -o "$VIDEOS_DIR/bird_test.mp4" 2>/dev/null || {
         echo "Failed to download fallback video. Tests requiring video detection will fail."
         echo "Please provide your own bird_test.mp4 in $VIDEOS_DIR"

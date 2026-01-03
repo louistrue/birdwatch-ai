@@ -149,6 +149,8 @@ class TestBirdwatchPipeline:
         
         print("Injecting mock bird snapshot...")
         shutil.copy("/fixtures/images/great_tit_1.jpg", f"{snapshot_dir}/injected_bird.jpg")
+        # Ensure fresh mtime for the classifier's polling logic
+        os.utime(f"{snapshot_dir}/injected_bird.jpg", None)
 
         # Wait for classifier to process
         print("Waiting for visual detection processing (30 seconds)...")
@@ -224,6 +226,8 @@ class TestBirdwatchPipeline:
         os.makedirs(snapshot_dir, exist_ok=True)
         import shutil
         shutil.copy("/fixtures/images/blue_tit_1.jpg", f"{snapshot_dir}/mqtt_test_bird.jpg")
+        # Ensure fresh mtime for the classifier's polling logic
+        os.utime(f"{snapshot_dir}/mqtt_test_bird.jpg", None)
 
         # Wait for messages
         print("Listening for MQTT detections (120 seconds)...")

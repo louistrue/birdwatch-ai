@@ -14,7 +14,8 @@ mkdir -p "$(dirname "$0")"
 cd "$(dirname "$0")"
 
 # Model URL (version 3 - latest)
-MODEL_URL="https://github.com/google-coral/test_data/raw/master/birds_v1.tflite"
+# Model URL (v3 quantized iNaturalist birds)
+MODEL_URL="https://storage.googleapis.com/tfhub-lite-models/google/lite-model/aiy/vision/classifier/birds_V1/3.tflite"
 MODEL_FILE="birds_model.tflite"
 
 # Labels URL

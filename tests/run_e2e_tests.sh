@@ -113,10 +113,13 @@ if [ "$1" = "--no-wait" ]; then
     echo "  docker-compose -f docker-compose.test.yml run --rm test-runner"
 else
     # Run tests
+    set +e
     docker-compose -f docker-compose.test.yml run --rm test-runner
+    TEST_EXIT_CODE=$?
+    set -e
 
     # Check test results
-    if [ $? -eq 0 ]; then
+    if [ $TEST_EXIT_CODE -eq 0 ]; then
         echo ""
         echo -e "${GREEN}=========================================${NC}"
         echo -e "${GREEN}  ✓ All tests passed!${NC}"

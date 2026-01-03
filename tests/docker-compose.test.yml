@@ -1,5 +1,3 @@
-version: '3.8'
-
 # E2E Testing Stack - Simulates entire birdwatch system without physical hardware
 
 services:

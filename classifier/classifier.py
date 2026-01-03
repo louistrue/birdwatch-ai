@@ -126,7 +126,11 @@ class BirdClassifier:
             # If model is quantized, dequantize values to [0, 1]
             if output_details['dtype'] == np.uint8:
                 scale, zero_point = output_details['quantization']
-                results = (results.astype(np.float32) - zero_point) * scale
+                if scale > 0:
+                    results = (results.astype(np.float32) - zero_point) * scale
+                else:
+                    # Fallback if quantization parameters are invalid
+                    results = results.astype(np.float32) / 255.0
 
             # Get top prediction
             top_idx = np.argmax(results)
@@ -248,10 +252,11 @@ class BirdDetectionHandler(FileSystemEventHandler):
 
 def connect_database():
     """Connect to PostgreSQL with retries"""
+    # Use production-safe defaults, override with env vars in test environment
     db_host = os.getenv('DB_HOST', 'database')
-    db_name = os.getenv('DB_NAME', 'birdwatch_test')
-    db_user = os.getenv('DB_USER', 'test_user')
-    db_pass = os.getenv('DB_PASSWORD', 'test_pass')
+    db_name = os.getenv('DB_NAME', 'birdwatch')
+    db_user = os.getenv('DB_USER', 'birdwatch')
+    db_pass = os.getenv('DB_PASSWORD', 'birdwatch123')
 
     max_retries = 30
     for i in range(max_retries):
@@ -323,17 +328,24 @@ def main():
     observer.start()
 
     logger.info(f"Watching for snapshots in {snapshots_dir}")
+    session_start_time = time.time()
 
     try:
         while True:
             # Fallback polling: check for any unprocessed images in snapshots_dir
+            # Added time check to avoid re-processing historical snapshots on restart
             for root, _, files in os.walk(snapshots_dir):
                 for file in files:
                     if file.lower().endswith(('.jpg', '.jpeg', '.png')):
                         full_path = os.path.join(root, file)
                         if full_path not in event_handler.processed_files:
-                            logger.info(f"Polling found unprocessed image: {full_path}")
-                            event_handler.process_image(full_path)
+                            # Only process if file was modified after session start
+                            if os.path.getmtime(full_path) > session_start_time - 5:
+                                logger.info(f"Polling found new image: {full_path}")
+                                event_handler.process_image(full_path)
+                            else:
+                                # Mark historical files as processed to avoid repeated checks
+                                event_handler.processed_files.add(full_path)
             time.sleep(5)
     except KeyboardInterrupt:
         logger.info("Shutting down...")

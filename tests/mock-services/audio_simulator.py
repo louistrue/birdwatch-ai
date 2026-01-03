@@ -29,15 +29,25 @@ TEST_SPECIES = [
 
 
 def connect_mqtt():
-    """Connect to MQTT broker"""
-    client = mqtt.Client(client_id="audio-simulator")
+    """Connect to MQTT broker with retries"""
+    import uuid
+    client_id = f"audio-simulator-{uuid.uuid4().hex[:8]}"
+    client = mqtt.Client(client_id=client_id)
     mqtt_host = os.getenv('MQTT_HOST', 'mosquitto')
     mqtt_port = int(os.getenv('MQTT_PORT', 1883))
 
-    logger.info(f"Connecting to MQTT at {mqtt_host}:{mqtt_port}")
-    client.connect(mqtt_host, mqtt_port)
-    client.loop_start()
-    return client
+    max_retries = 30
+    for i in range(max_retries):
+        try:
+            logger.info(f"Connecting to MQTT as {client_id} at {mqtt_host}:{mqtt_port} (attempt {i+1}/{max_retries})")
+            client.connect(mqtt_host, mqtt_port)
+            client.loop_start()
+            return client
+        except Exception as e:
+            if i == max_retries - 1:
+                logger.error(f"Failed to connect to MQTT after {max_retries} attempts: {e}")
+                raise
+            time.sleep(2)
 
 
 def simulate_audio_detection(mqtt_client):

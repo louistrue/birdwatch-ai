@@ -94,7 +94,7 @@ class BirdCorrelator:
             self.db_conn.commit()
             cursor.close()
         except Exception as e:
-            logger.error(f"Failed to save raw audio detection: {e}")
+            logger.exception(f"Failed to save raw audio detection: {e}")
             self.db_conn.rollback()
 
     def _check_correlations(self):
@@ -214,9 +214,9 @@ class MQTTHandler:
 def connect_database():
     """Connect to PostgreSQL with retries"""
     db_host = os.getenv('DB_HOST', 'database')
-    db_name = os.getenv('DB_NAME', 'birdwatch_test')
-    db_user = os.getenv('DB_USER', 'test_user')
-    db_pass = os.getenv('DB_PASSWORD', 'test_pass')
+    db_name = os.getenv('DB_NAME', 'birdwatch')
+    db_user = os.getenv('DB_USER', 'birdwatch')
+    db_pass = os.getenv('DB_PASSWORD', 'birdwatch123')
 
     max_retries = 30
     for i in range(max_retries):

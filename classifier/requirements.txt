@@ -1,7 +1,7 @@
-tflite-runtime>=2.11.0
-pillow==10.1.0
-numpy==1.24.3
-paho-mqtt==1.6.1
+tflite-runtime
+pillow>=10.3.0
 psycopg2-binary==2.9.9
+paho-mqtt==1.6.1
 watchdog==3.0.0
+numpy<2
 python-dotenv==1.0.0
