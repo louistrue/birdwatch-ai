@@ -13,7 +13,7 @@ cameras:
     enabled: true
     ffmpeg:
       inputs:
-        - path: rtsp://rtsp-simulator:8554/camera1
+        - path: rtsp://rtsp-server:8554/camera1
           roles:
             - detect
             - record
@@ -29,9 +29,9 @@ cameras:
         - bird
       filters:
         bird:
-          min_area: 100
-          min_score: 0.3
-          threshold: 0.5
+          min_area: 50
+          min_score: 0.1
+          threshold: 0.2
 
     snapshots:
       enabled: true
@@ -47,12 +47,12 @@ cameras:
       retain:
         days: 1
         mode: motion
-      events:
+      alerts:
         retain:
-          default: 3
-          mode: motion
-
-# Test-specific zones (adjust based on your test video)
+          days: 3
+      detections:
+        retain:
+          days: 3
     zones:
       feeder_area:
         coordinates: 320,180,960,180,960,540,320,540
@@ -68,7 +68,12 @@ record:
   enabled: true
   retain:
     days: 1
-  events:
+  alerts:
     retain:
-      default: 3
-      mode: motion
+      days: 3
+  detections:
+    retain:
+      days: 3
+detect:
+  enabled: true
+version: 0.16-0

@@ -5,6 +5,7 @@ Matches visual and audio detections to create high-confidence sightings
 """
 
 import os
+import time
 import json
 import logging
 from datetime import datetime, timedelta
@@ -41,6 +42,7 @@ class BirdCorrelator:
             'confidence': detection['confidence'],
             'image_path': detection.get('image_path')
         })
+        self._save_raw_detection('visual', detection)
         self._cleanup_old_detections()
         self._check_correlations()
 
@@ -53,6 +55,7 @@ class BirdCorrelator:
             'confidence': detection['confidence'],
             'audio_path': detection.get('audio_path')
         })
+        self._save_raw_detection('audio', detection)
         self._cleanup_old_detections()
         self._check_correlations()
 
@@ -65,6 +68,34 @@ class BirdCorrelator:
                 d for d in self.recent_detections[source]
                 if d['timestamp'] > cutoff_time
             ]
+
+    def _save_raw_detection(self, source, detection):
+        """Save raw detection to database if not already saved by another service"""
+        # Note: Visual detections are usually saved by the classifier itself,
+        # but for robustness we can ensure it here or only do it for audio.
+        # Based on Test Suite, we need audio_detections to be populated.
+        if source == 'visual':
+            return # Classifier already saves visual detections
+
+        try:
+            cursor = self.db_conn.cursor()
+            cursor.execute("""
+                INSERT INTO audio_detections
+                (timestamp, species, common_name, confidence, audio_path, source)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                datetime.fromisoformat(detection['timestamp']),
+                detection['species'],
+                detection['common_name'],
+                detection['confidence'],
+                detection.get('audio_path'),
+                detection.get('source', 'audio_simulator')
+            ))
+            self.db_conn.commit()
+            cursor.close()
+        except Exception as e:
+            logger.error(f"Failed to save raw audio detection: {e}")
+            self.db_conn.rollback()
 
     def _check_correlations(self):
         """Check for matching visual and audio detections"""
@@ -181,19 +212,29 @@ class MQTTHandler:
 
 
 def connect_database():
-    """Connect to PostgreSQL database"""
-    try:
-        conn = psycopg2.connect(
-            host=os.getenv('DB_HOST', 'database'),
-            database=os.getenv('DB_NAME', 'birdwatch'),
-            user=os.getenv('DB_USER', 'birdwatch'),
-            password=os.getenv('DB_PASSWORD', 'birdwatch123')
-        )
-        logger.info("Connected to database")
-        return conn
-    except Exception as e:
-        logger.error(f"Database connection failed: {e}")
-        raise
+    """Connect to PostgreSQL with retries"""
+    db_host = os.getenv('DB_HOST', 'database')
+    db_name = os.getenv('DB_NAME', 'birdwatch_test')
+    db_user = os.getenv('DB_USER', 'test_user')
+    db_pass = os.getenv('DB_PASSWORD', 'test_pass')
+
+    max_retries = 30
+    for i in range(max_retries):
+        try:
+            conn = psycopg2.connect(
+                host=db_host,
+                database=db_name,
+                user=db_user,
+                password=db_pass
+            )
+            logger.info("Connected to database")
+            return conn
+        except psycopg2.OperationalError as e:
+            if i == max_retries - 1:
+                logger.error(f"Database connection failed after {max_retries} attempts: {e}")
+                raise
+            logger.warning(f"Database not ready, retrying in 2s... ({i+1}/{max_retries})")
+            time.sleep(2)
 
 
 def main():

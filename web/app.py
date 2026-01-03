@@ -15,9 +15,9 @@ app = Flask(__name__)
 # Database configuration
 DB_CONFIG = {
     'host': os.getenv('DB_HOST', 'database'),
-    'database': os.getenv('DB_NAME', 'birdwatch'),
-    'user': os.getenv('DB_USER', 'birdwatch'),
-    'password': os.getenv('DB_PASSWORD', 'birdwatch123')
+    'database': os.getenv('DB_NAME', 'birdwatch_test'),
+    'user': os.getenv('DB_USER', 'test_user'),
+    'password': os.getenv('DB_PASSWORD', 'test_pass')
 }
 
 FRIGATE_URL = os.getenv('FRIGATE_URL', 'http://frigate:5000')

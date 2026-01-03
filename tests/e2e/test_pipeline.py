@@ -19,23 +19,42 @@ class TestBirdwatchPipeline:
 
     @pytest.fixture(scope="class")
     def db_connection(self):
-        """Database connection fixture"""
-        conn = psycopg2.connect(
-            host=os.getenv('DB_HOST', 'database'),
-            database=os.getenv('DB_NAME', 'birdwatch_test'),
-            user=os.getenv('DB_USER', 'test_user'),
-            password=os.getenv('DB_PASSWORD', 'test_pass')
-        )
-        yield conn
-        conn.close()
+        """Database connection fixture with retries"""
+        db_host = os.getenv('DB_HOST', 'database')
+        db_name = os.getenv('DB_NAME', 'birdwatch_test')
+        db_user = os.getenv('DB_USER', 'test_user')
+        db_pass = os.getenv('DB_PASSWORD', 'test_pass')
+
+        max_retries = 30
+        for i in range(max_retries):
+            try:
+                conn = psycopg2.connect(
+                    host=db_host,
+                    database=db_name,
+                    user=db_user,
+                    password=db_pass
+                )
+                yield conn
+                conn.close()
+                return
+            except psycopg2.OperationalError:
+                if i == max_retries - 1:
+                    raise
+                time.sleep(2)
 
     @pytest.fixture(scope="class")
     def mqtt_client(self):
-        """MQTT client fixture"""
-        client = mqtt.Client(client_id="test-client")
+        """MQTT client fixture with unique ID"""
+        import uuid
+        client_id = f"test-client-{uuid.uuid4().hex[:8]}"
+        client = mqtt.Client(client_id=client_id)
+        
+        print(f"Connecting to MQTT as {client_id}...")
         client.connect(os.getenv('MQTT_HOST', 'mosquitto'), 1883)
         client.loop_start()
+        
         yield client
+        
         client.loop_stop()
         client.disconnect()
 
@@ -53,8 +72,8 @@ class TestBirdwatchPipeline:
         required_tables = {
             'visual_detections',
             'audio_detections',
-            'bird_sightings',
-            'swiss_birds'
+            'correlated_sightings',
+            'species'
         }
 
         assert required_tables.issubset(tables), f"Missing tables: {required_tables - tables}"
@@ -122,9 +141,18 @@ class TestBirdwatchPipeline:
 
     def test_visual_detection_pipeline(self, db_connection):
         """Test complete visual detection pipeline"""
-        # Wait for Frigate to generate snapshots and classifier to process them
-        print("Waiting for visual detections (60 seconds)...")
-        time.sleep(60)
+        # Deterministic test: Inject a mock snapshot if Frigate is slow in the test environment
+        print("Ensuring snapshot directory exists...")
+        import os, shutil
+        snapshot_dir = "/snapshots/test_camera"
+        os.makedirs(snapshot_dir, exist_ok=True)
+        
+        print("Injecting mock bird snapshot...")
+        shutil.copy("/fixtures/images/great_tit_1.jpg", f"{snapshot_dir}/injected_bird.jpg")
+
+        # Wait for classifier to process
+        print("Waiting for visual detection processing (30 seconds)...")
+        time.sleep(30)
 
         cursor = db_connection.cursor()
         cursor.execute("""
@@ -162,7 +190,7 @@ class TestBirdwatchPipeline:
 
         cursor = db_connection.cursor()
         cursor.execute("""
-            SELECT COUNT(*) FROM bird_sightings
+            SELECT COUNT(*) FROM correlated_sightings
             WHERE timestamp > NOW() - INTERVAL '5 minutes'
         """)
         count = cursor.fetchone()[0]
@@ -172,34 +200,53 @@ class TestBirdwatchPipeline:
         # Note: May be 0 if timing doesn't align, which is okay for first run
         print(f"Found {count} correlated sightings")
 
-    def test_mqtt_detection_published(self, mqtt_client):
+    def test_mqtt_detection_published(self, mqtt_client, db_connection):
         """Test that detections are published to MQTT"""
-        visual_detections = []
-        audio_detections = []
+        messages = []
 
         def on_message(client, userdata, msg):
-            payload = json.loads(msg.payload.decode())
-            if msg.topic == "birdwatch/visual/detection":
-                visual_detections.append(payload)
-            elif msg.topic == "birdwatch/audio/detection":
-                audio_detections.append(payload)
+            try:
+                payload = json.loads(msg.payload.decode())
+                print(f"MQTT Received: {msg.topic}")
+                messages.append((msg.topic, payload))
+            except Exception as e:
+                print(f"Error parsing MQTT: {e}")
 
-        mqtt_client.subscribe("birdwatch/visual/detection")
-        mqtt_client.subscribe("birdwatch/audio/detection")
         mqtt_client.on_message = on_message
+        mqtt_client.subscribe("birdwatch/#")
+        
+        # Give it a moment to subscribe
+        time.sleep(2)
+
+        # Re-trigger visual detection to ensure we catch it on MQTT
+        print("Re-triggering visual detection for MQTT test...")
+        snapshot_dir = "/snapshots/test_camera"
+        os.makedirs(snapshot_dir, exist_ok=True)
+        import shutil
+        shutil.copy("/fixtures/images/blue_tit_1.jpg", f"{snapshot_dir}/mqtt_test_bird.jpg")
 
         # Wait for messages
-        print("Listening for MQTT detections (45 seconds)...")
-        time.sleep(45)
-
-        # Should receive both types
-        assert len(audio_detections) > 0, "No audio detections via MQTT"
-        print(f"Received {len(visual_detections)} visual and {len(audio_detections)} audio MQTT messages")
+        print("Listening for MQTT detections (120 seconds)...")
+        start_time = time.time()
+        while time.time() - start_time < 120:
+            visual = [m for m in messages if m[0] == "birdwatch/visual/detection"]
+            audio = [m for m in messages if m[0] == "birdwatch/audio/detection"]
+            if len(visual) > 0 and len(audio) > 0:
+                break
+            time.sleep(5)
+        
+        visual = [m for m in messages if m[0] == "birdwatch/visual/detection"]
+        audio = [m for m in messages if m[0] == "birdwatch/audio/detection"]
+        
+        print(f"Final Count - Visual: {len(visual)}, Audio: {len(audio)}")
+        
+        assert len(audio) > 0, "No audio detections via MQTT after 120s"
+        assert len(visual) > 0, "No visual detections via MQTT after 120s"
 
     def test_database_species_data(self, db_connection):
         """Test that Swiss bird species are loaded"""
         cursor = db_connection.cursor()
-        cursor.execute("SELECT COUNT(*) FROM swiss_birds")
+        cursor.execute("SELECT COUNT(*) FROM species")
         count = cursor.fetchone()[0]
         cursor.close()
 

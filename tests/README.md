@@ -32,7 +32,7 @@ This will:
 After tests complete:
 
 - **Test Report**: `tests/data/report.html` (open in browser)
-- **Frigate UI**: http://localhost:5000
+- **Frigate UI**: http://localhost:5050
 - **Web Dashboard**: http://localhost:8081
 
 ## What Gets Tested

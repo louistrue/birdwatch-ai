@@ -88,12 +88,16 @@ class BirdClassifier:
             image = Image.open(image_path).convert('RGB')
             image = image.resize((width, height), Image.LANCZOS)
 
-            # Convert to numpy array
-            input_data = np.array(image, dtype=np.float32)
-
-            # Normalize to [0, 1] or [-1, 1] depending on model
-            input_data = input_data / 255.0
-
+            # Convert to numpy array and handle expected input type
+            input_type = self.input_details[0]['dtype']
+            
+            if input_type == np.uint8:
+                input_data = np.array(image, dtype=np.uint8)
+            else:
+                input_data = np.array(image, dtype=np.float32)
+                # Normalize to [0, 1] for float models
+                input_data = input_data / 255.0
+            
             # Add batch dimension
             input_data = np.expand_dims(input_data, axis=0)
 
@@ -114,9 +118,15 @@ class BirdClassifier:
             self.interpreter.set_tensor(self.input_details[0]['index'], input_data)
             self.interpreter.invoke()
 
-            # Get output
-            output_data = self.interpreter.get_tensor(self.output_details[0]['index'])
+            # Get output and dequantize if necessary
+            output_details = self.output_details[0]
+            output_data = self.interpreter.get_tensor(output_details['index'])
             results = np.squeeze(output_data)
+
+            # If model is quantized, dequantize values to [0, 1]
+            if output_details['dtype'] == np.uint8:
+                scale, zero_point = output_details['quantization']
+                results = (results.astype(np.float32) - zero_point) * scale
 
             # Get top prediction
             top_idx = np.argmax(results)
@@ -237,19 +247,29 @@ class BirdDetectionHandler(FileSystemEventHandler):
 
 
 def connect_database():
-    """Connect to PostgreSQL database"""
-    try:
-        conn = psycopg2.connect(
-            host=os.getenv('DB_HOST', 'database'),
-            database=os.getenv('DB_NAME', 'birdwatch'),
-            user=os.getenv('DB_USER', 'birdwatch'),
-            password=os.getenv('DB_PASSWORD', 'birdwatch123')
-        )
-        logger.info("Connected to database")
-        return conn
-    except Exception as e:
-        logger.error(f"Database connection failed: {e}")
-        raise
+    """Connect to PostgreSQL with retries"""
+    db_host = os.getenv('DB_HOST', 'database')
+    db_name = os.getenv('DB_NAME', 'birdwatch_test')
+    db_user = os.getenv('DB_USER', 'test_user')
+    db_pass = os.getenv('DB_PASSWORD', 'test_pass')
+
+    max_retries = 30
+    for i in range(max_retries):
+        try:
+            conn = psycopg2.connect(
+                host=db_host,
+                database=db_name,
+                user=db_user,
+                password=db_pass
+            )
+            logger.info("Connected to database")
+            return conn
+        except psycopg2.OperationalError as e:
+            if i == max_retries - 1:
+                logger.error(f"Database connection failed after {max_retries} attempts: {e}")
+                raise
+            logger.warning(f"Database not ready, retrying in 2s... ({i+1}/{max_retries})")
+            time.sleep(2)
 
 
 def connect_mqtt():
@@ -306,7 +326,15 @@ def main():
 
     try:
         while True:
-            time.sleep(1)
+            # Fallback polling: check for any unprocessed images in snapshots_dir
+            for root, _, files in os.walk(snapshots_dir):
+                for file in files:
+                    if file.lower().endswith(('.jpg', '.jpeg', '.png')):
+                        full_path = os.path.join(root, file)
+                        if full_path not in event_handler.processed_files:
+                            logger.info(f"Polling found unprocessed image: {full_path}")
+                            event_handler.process_image(full_path)
+            time.sleep(5)
     except KeyboardInterrupt:
         logger.info("Shutting down...")
         observer.stop()

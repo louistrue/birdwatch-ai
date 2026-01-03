@@ -137,7 +137,7 @@ fi
 
 echo ""
 echo "Access test services:"
-echo "  Frigate UI:    http://localhost:5000"
+echo "  Frigate UI:    http://localhost:5052"
 echo "  Web Dashboard: http://localhost:8081"
 echo ""
 echo "Useful commands:"

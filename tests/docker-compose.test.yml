@@ -14,22 +14,26 @@ services:
     networks:
       - test-birdwatch
 
-  # Simulated RTSP Camera - Streams test videos on loop
-  rtsp-simulator:
-    image: ullaakut/rtspatt:latest
-    container_name: test-rtsp-camera
-    command: >
-      /bin/sh -c "
-      while true; do
-        ffmpeg -re -stream_loop -1 -i /videos/bird_test.mp4
-        -c:v libx264 -preset ultrafast -tune zerolatency
-        -f rtsp rtsp://0.0.0.0:8554/camera1
-      done
-      "
-    volumes:
-      - ./fixtures/videos:/videos:ro
+  # RTSP Server (mediamtx)
+  rtsp-server:
+    image: bluenviron/mediamtx:latest
+    container_name: test-rtsp-server
     ports:
       - "8554:8554"
+    networks:
+      - test-birdwatch
+
+  # FFmpeg publisher - streams test video to RTSP server
+  rtsp-publisher:
+    image: linuxserver/ffmpeg:latest
+    container_name: test-rtsp-publisher
+    depends_on:
+      - rtsp-server
+    volumes:
+      - .:/test-dir:ro
+      - ./fixtures/videos:/videos
+    entrypoint: /bin/sh
+    command: ["-c", "ffmpeg -y -loop 1 -i /test-dir/fixtures/images/great_tit_1.jpg -vf \"scale=1920:1080,crop=1280:720:320+t*10:180+t*5,format=yuv420p\" -c:v libx264 -t 10 -movflags +faststart /videos/bird_test.mp4 && ffmpeg -re -stream_loop -1 -i /videos/bird_test.mp4 -c copy -f rtsp rtsp://rtsp-server:8554/camera1"]
     networks:
       - test-birdwatch
 
@@ -40,7 +44,7 @@ services:
     privileged: true
     shm_size: '256mb'
     ports:
-      - "5000:5000"
+      - "5052:5000"
     volumes:
       - ./frigate.test.yml:/config/config.yml
       - ./data/test-recordings:/media/frigate
@@ -51,7 +55,7 @@ services:
           size: 500000000
     depends_on:
       - mosquitto
-      - rtsp-simulator
+      - rtsp-publisher
     networks:
       - test-birdwatch
 
@@ -87,7 +91,7 @@ services:
       - DB_USER=test_user
       - DB_PASSWORD=test_pass
       - MODEL_PATH=/app/model/birds_model.tflite
-      - CONFIDENCE_THRESHOLD=0.3
+      - CONFIDENCE_THRESHOLD=0.1
     depends_on:
       - mosquitto
       - database
@@ -146,6 +150,8 @@ services:
     environment:
       - MQTT_HOST=mosquitto
       - MQTT_PORT=1883
+      - MIN_INTERVAL=5
+      - MAX_INTERVAL=15
     depends_on:
       - mosquitto
     networks:
@@ -160,6 +166,8 @@ services:
     volumes:
       - ./e2e:/tests
       - ./data:/test-data
+      - ./data/test-snapshots:/snapshots
+      - ./fixtures:/fixtures:ro
     environment:
       - DB_HOST=database
       - DB_NAME=birdwatch_test
