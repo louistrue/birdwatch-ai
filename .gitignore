@@ -45,7 +45,10 @@ env/
 classifier/model/*.tflite
 classifier/model/*.h5
 classifier/model/*.pb
+classifier/model/labels.txt
 !classifier/model/README.md
+!classifier/model/download_model.sh
+!classifier/model/test_model.py
 
 # IDE
 .vscode/

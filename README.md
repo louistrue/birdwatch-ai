@@ -96,16 +96,35 @@ CAMERA_USER=admin
 CAMERA_PASSWORD=your_camera_password
 ```
 
-### 3. Get a Bird Classification Model
+### 3. Download Bird Classification Model
 
-Download a TFLite bird classification model:
+The system uses the Google AIY Vision Bird Classifier (~965 species):
 
 ```bash
 cd classifier/model
-# Download iNaturalist birds model or Caltech-UCSD Birds 200
-# Place as birds_model.tflite
-# See classifier/model/README.md for options
+./download_model.sh
 ```
+
+This downloads:
+- `birds_model.tflite` - MobileNet V2 bird classifier (~4MB)
+- `labels.txt` - Species labels for ~965 bird species
+
+**Manual download** (if script fails):
+```bash
+# Model
+wget -O birds_model.tflite https://storage.googleapis.com/tfhub-lite-models/google/lite-model/aiy/vision/classifier/birds_V1/3.tflite
+
+# Labels
+wget -O labels.txt https://raw.githubusercontent.com/google-coral/test_data/master/inat_bird_labels.txt
+```
+
+**Test the model:**
+```bash
+python3 test_model.py
+cd ../..
+```
+
+See `classifier/model/README.md` for detailed model information.
 
 ### 4. Configure Frigate
 

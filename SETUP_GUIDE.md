@@ -192,36 +192,73 @@ You'll need to adjust the zone coordinates after seeing your camera view:
 4. Note the coordinates of your bird feeder
 5. Update the zone in `frigate/config.yml`
 
-## Phase 4: Get Bird Classification Model
+## Phase 4: Download Bird Classification Model
 
-### Option 1: Download Pre-trained Model (Recommended for Testing)
+### Recommended: Google AIY Vision Bird Classifier
+
+Download the model using the provided script:
 
 ```bash
-# For now, we'll use a placeholder
-# You'll need to download a real TFLite bird model
+cd ~/birdwatch-ai/classifier/model
 
-cd classifier/model
-
-# Option A: iNaturalist Birds
-# Download from: https://www.kaggle.com/models?framework=tfLite&task=image-classification
-# Search for "bird classification"
-
-# Option B: MobileNet Birds (lighter, faster)
-# Download and convert a MobileNet model trained on birds
-
-# Place the model as: birds_model.tflite
-# Create labels.txt with one species per line
+# Run download script
+./download_model.sh
 ```
 
-### Option 2: Start Without Classification
+This downloads:
+- **birds_model.tflite** - Google AIY bird classifier (~4MB)
+- **labels.txt** - Species labels for ~965 bird species
 
-For initial testing, you can run without species classification:
+### Manual Download (if script fails)
+
+If the automatic download doesn't work:
+
+```bash
+cd ~/birdwatch-ai/classifier/model
+
+# Download model
+wget -O birds_model.tflite \
+  https://storage.googleapis.com/tfhub-lite-models/google/lite-model/aiy/vision/classifier/birds_V1/3.tflite
+
+# Download labels
+wget -O labels.txt \
+  https://raw.githubusercontent.com/google-coral/test_data/master/inat_bird_labels.txt
+```
+
+Or use curl:
+```bash
+curl -L -o birds_model.tflite \
+  https://storage.googleapis.com/tfhub-lite-models/google/lite-model/aiy/vision/classifier/birds_V1/3.tflite
+
+curl -L -o labels.txt \
+  https://raw.githubusercontent.com/google-coral/test_data/master/inat_bird_labels.txt
+```
+
+### Test the Model
+
+Verify the model works:
+
+```bash
+python3 test_model.py
+```
+
+Expected output:
+- Model loaded successfully
+- Input shape: [1, 224, 224, 3]
+- Output shape: [1, 965]
+- Sample predictions shown
+
+### Option: Start Without Classification
+
+For initial testing, you can skip classification:
 
 ```bash
 # Comment out the classifier service in docker-compose.yml
-nano docker-compose.yml
+nano ~/birdwatch-ai/docker-compose.yml
 # Add # before each line in the classifier: section
 ```
+
+**Note**: Without classification, you'll only get generic "bird" detections from Frigate.
 
 ## Phase 5: Launch System
 
