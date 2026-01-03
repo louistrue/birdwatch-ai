@@ -1,0 +1,139 @@
+mqtt:
+  host: mosquitto
+  port: 1883
+  topic_prefix: birdwatch
+  client_id: frigate
+
+database:
+  path: /config/frigate.db
+
+detectors:
+  cpu:
+    type: cpu
+    num_threads: 2
+  # Uncomment if you have a Coral USB Accelerator
+  # coral:
+  #   type: edgetpu
+  #   device: usb
+
+# Model configuration
+model:
+  width: 320
+  height: 320
+  input_tensor: nhwc
+  input_pixel_format: rgb
+  labelmap_path: /labelmap/coco_labels.txt
+
+# Snapshot configuration
+snapshots:
+  enabled: true
+  timestamp: false
+  bounding_box: true
+  crop: false
+  quality: 90
+  retain:
+    default: 7
+    objects:
+      bird: 30
+
+# Recording configuration
+record:
+  enabled: true
+  retain:
+    days: 7
+    mode: motion
+  events:
+    retain:
+      default: 14
+      mode: motion
+      objects:
+        bird: 30
+
+# Object detection settings
+objects:
+  track:
+    - bird
+  filters:
+    bird:
+      min_area: 500
+      max_area: 100000
+      min_score: 0.5
+      threshold: 0.7
+
+# Camera configuration (update with your camera details)
+cameras:
+  garden_feeder:
+    enabled: true
+    ffmpeg:
+      inputs:
+        # Main stream for recording (high quality)
+        - path: rtsp://admin:password@192.168.1.100:554/stream1
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        # Sub stream for detection (lower quality, less CPU)
+        - path: rtsp://admin:password@192.168.1.100:554/stream2
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
+      stationary:
+        interval: 50
+        threshold: 50
+
+    motion:
+      threshold: 30
+      contour_area: 50
+      lightning_threshold: 0.8
+
+    # Define zones to focus on feeder area
+    zones:
+      feeder:
+        coordinates: 400,300,800,300,800,600,400,600
+        objects:
+          - bird
+        filters:
+          bird:
+            min_area: 500
+            max_area: 50000
+
+    snapshots:
+      enabled: true
+      timestamp: true
+      bounding_box: true
+      crop: true
+      required_zones:
+        - feeder
+      retain:
+        default: 7
+        objects:
+          bird: 30
+
+    record:
+      enabled: true
+      retain:
+        days: 7
+        mode: motion
+      events:
+        pre_capture: 5
+        post_capture: 10
+        retain:
+          default: 14
+          mode: motion
+          objects:
+            bird: 30
+
+# Automatically save snapshots to a folder for classifier
+save_clips:
+  enabled: true
+
+# Experimental features
+logger:
+  default: info
+  logs:
+    frigate.mqtt: debug

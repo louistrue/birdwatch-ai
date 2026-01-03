@@ -1,0 +1,141 @@
+version: '3.8'
+
+services:
+  # MQTT Broker for inter-service communication
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: birdwatch-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    networks:
+      - birdwatch
+
+  # Frigate NVR for video detection
+  frigate:
+    image: ghcr.io/blakeblackshear/frigate:stable
+    container_name: birdwatch-frigate
+    restart: unless-stopped
+    privileged: true
+    shm_size: '256mb'
+    ports:
+      - "5000:5000"
+      - "8554:8554"  # RTSP feeds
+      - "8555:8555/tcp"  # WebRTC over tcp
+      - "8555:8555/udp"  # WebRTC over udp
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./frigate/config.yml:/config/config.yml
+      - ./data/recordings:/media/frigate
+      - ./data/snapshots:/media/snapshots
+      - type: tmpfs
+        target: /tmp/cache
+        tmpfs:
+          size: 1000000000
+    environment:
+      - FRIGATE_RTSP_PASSWORD=${FRIGATE_RTSP_PASSWORD:-password}
+    depends_on:
+      - mosquitto
+    networks:
+      - birdwatch
+
+  # PostgreSQL database for storing bird sightings
+  database:
+    image: postgres:15-alpine
+    container_name: birdwatch-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      - POSTGRES_DB=birdwatch
+      - POSTGRES_USER=birdwatch
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-birdwatch123}
+    networks:
+      - birdwatch
+
+  # Bird visual classifier service
+  classifier:
+    build:
+      context: ./classifier
+      dockerfile: Dockerfile
+    container_name: birdwatch-classifier
+    restart: unless-stopped
+    volumes:
+      - ./data/snapshots:/snapshots
+      - ./classifier/model:/app/model
+      - ./data/recordings:/recordings
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - DB_HOST=database
+      - DB_NAME=birdwatch
+      - DB_USER=birdwatch
+      - DB_PASSWORD=${DB_PASSWORD:-birdwatch123}
+      - MODEL_PATH=/app/model/birds_model.tflite
+      - CONFIDENCE_THRESHOLD=0.6
+    depends_on:
+      - mosquitto
+      - database
+    networks:
+      - birdwatch
+
+  # Correlation engine
+  correlator:
+    build:
+      context: ./correlator
+      dockerfile: Dockerfile
+    container_name: birdwatch-correlator
+    restart: unless-stopped
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - DB_HOST=database
+      - DB_NAME=birdwatch
+      - DB_USER=birdwatch
+      - DB_PASSWORD=${DB_PASSWORD:-birdwatch123}
+      - CORRELATION_WINDOW=30
+    depends_on:
+      - mosquitto
+      - database
+      - classifier
+    networks:
+      - birdwatch
+
+  # Web dashboard
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: birdwatch-web
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data/snapshots:/app/static/snapshots:ro
+      - ./data/recordings:/app/static/recordings:ro
+    environment:
+      - DB_HOST=database
+      - DB_NAME=birdwatch
+      - DB_USER=birdwatch
+      - DB_PASSWORD=${DB_PASSWORD:-birdwatch123}
+      - FRIGATE_URL=http://frigate:5000
+    depends_on:
+      - database
+      - frigate
+    networks:
+      - birdwatch
+
+networks:
+  birdwatch:
+    driver: bridge
+
+volumes:
+  postgres_data:
