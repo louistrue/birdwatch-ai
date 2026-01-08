@@ -124,28 +124,25 @@ sequenceDiagram
 
 ---
 
-## Performance Characteristics
-
-```mermaid
-gantt
-    title Detection Latency Breakdown
-    dateFormat X
-    axisFormat %L ms
-    
-    section Visual
-    YOLO Detection     :0, 33
-    Species Classification :33, 103
-    
-    section Audio
-    Recording Window   :0, 3000
-    BirdNET Analysis   :3000, 4200
-```
+## Performance
 
 | Stage | Hardware | Latency | Model |
 |-------|----------|---------|-------|
-| Object Detection | Hailo-8 NPU | 33ms | YOLOv8m |
-| Species Classification | ARM CPU | 70ms | MobileNet V2 |
-| Audio Analysis | ARM CPU | 1.2s per 3s clip | BirdNET v2.4 |
+| Object Detection | Hailo-8 NPU | **33ms** | YOLOv8m |
+| Species Classification | ARM CPU | **70ms** | MobileNet V2 |
+| Audio Analysis | ARM CPU | **1.2s** / 3s clip | BirdNET v2.4 |
+| **End-to-end Visual** | | **~100ms** | |
+
+```
+Visual Pipeline
+├─ YOLO Detection ████ 33ms
+└─ Species ID     ██████████████████ 70ms
+                  └──────────────────────┘ ~100ms total
+
+Audio Pipeline (parallel)
+├─ Recording      ████████████████████████████████████ 3000ms
+└─ BirdNET        ████████████ 1200ms
+```
 
 ---
 
