@@ -1,0 +1,43 @@
+# Environment and credentials
+.env
+.env.local
+.env.*.local
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+.venv/
+
+# Detection data (large files, personal data)
+detections/
+logs/
+*.json
+
+# Test files
+tests/*.wav
+tests/*.mp4
+
+# Models (large binary files)
+models/*.tflite
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary
+*.tmp
+*.temp
+*.log

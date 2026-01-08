@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bird Watcher</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="title-section">
+                <h1>Bird Watcher</h1>
+                <span class="subtitle">Hailo NPU / TFLite / BirdNET</span>
+            </div>
+            <div class="header-controls">
+                <button id="soundToggle" class="control-btn" title="Toggle sound notifications">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <path id="soundWaves" d="M15.54 8.46a5 5 0 0 1 0 7.07 M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                    </svg>
+                </button>
+                <div class="status" id="status">
+                    <span class="status-indicator" id="statusIndicator"></span>
+                    <span id="statusText">Connecting</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="stats-row">
+            <div class="stat-item">
+                <span class="stat-value" id="statTotal">0</span>
+                <span class="stat-label">Detections</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="statBirds">0</span>
+                <span class="stat-label">Birds</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="statRecent">0</span>
+                <span class="stat-label">Last Hour</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="statSpecies">0</span>
+                <span class="stat-label">Species</span>
+            </div>
+        </div>
+
+        <div class="activity-bar" id="activityBar" title="Detection activity over time">
+            <!-- Activity visualization bars will be injected here -->
+        </div>
+
+        <div class="main-grid">
+            <div class="gallery-section">
+                <div class="section-header">
+                    <h2>Recent Captures</h2>
+                    <span class="section-count" id="galleryCount">0</span>
+                </div>
+                <div class="gallery" id="gallery">
+                    <div class="gallery-empty">Waiting for detections...</div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="section-header">
+                    <h2>Latest Detection</h2>
+                </div>
+                <div id="latestDetection" class="latest-panel">
+                    <div class="empty-state">No detections yet</div>
+                </div>
+
+                <div class="section-header" style="margin-top: 24px;">
+                    <h2>Species Observed</h2>
+                </div>
+                <div id="speciesBreakdown" class="species-list">
+                    <div class="empty-state">No data</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="detection-flash" id="detectionFlash"></div>
+
+    <audio id="birdSound" preload="auto">
+        <source src="https://www.soundjay.com/nature/bird-chirping-01.mp3" type="audio/mpeg">
+    </audio>
+
+    <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+</body>
+
+</html>
